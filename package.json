@@ -1,0 +1,27 @@
+{
+  "name": "ai-memory-lane",
+  "version": "1.0.0",
+  "description": "Shared long-term memory and core instructions across every AI client, as an MCP server.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx scripts/local-server.ts",
+    "core": "tsx scripts/core.ts",
+    "test": "tsx scripts/test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@neondatabase/serverless": "^1.2.0",
+    "tsx": "4.20.6",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}
