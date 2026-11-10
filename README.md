@@ -15,16 +15,18 @@ There is no page and no sign-in. It is a server, a PostgreSQL database and one t
 
 ## Run it on your machine
 
-Needs Node.js 22 or newer.
+Needs Node.js 22 or newer. Clone this repository, then run in its folder:
 
 ```bash
 npm install
 npm start
 ```
 
-The server listens on `http://127.0.0.1:4173`, keeps its data in `.memory-lane/`, and prints a token on first run (it is also saved in `.memory-lane/token`). Set `PORT` or `MEMORY_DATA_DIR` to change where it runs and stores data, or `MCP_TOKEN` to bring your own. `MEMORY_FIXTURES=1 npm start` uses a throwaway in-memory database with a few sample memories.
+Leave it running. The server listens on `http://127.0.0.1:4173`, keeps its data in `.memory-lane/`, and prints its token every time it starts (the token is created on the first run and saved in `.memory-lane/token`). Set `PORT` or `MEMORY_DATA_DIR` to change where it runs and stores data, or `MCP_TOKEN` to bring your own. `MEMORY_FIXTURES=1 npm start` uses a throwaway in-memory database with a few sample memories.
 
-Only your own machine can reach it, and requests with an unexpected `Host` header are refused.
+Only your own machine can reach it, and requests with an unexpected `Host` header are refused. That also means web clients such as claude.ai and ChatGPT cannot use a local server: they connect from the internet, so deploy it for those.
+
+The commands here that start with `NAME=value` are for macOS and Linux shells. In Windows PowerShell, set the variable first: `$env:MEMORY_FIXTURES = "1"; npm start`.
 
 ## Deploy it (Vercel + Neon)
 
@@ -46,11 +48,28 @@ Use the endpoint (`http://127.0.0.1:4173/mcp` locally) with the token either way
 - **Header, preferred:** `Authorization: Bearer <token>`.
 - **URL, for clients that only accept a URL:** `https://<host>/mcp?token=<token>`. A token in a URL can end up in logs, so use the header when you can.
 
-For example, in Claude Code:
+Claude Code:
 
 ```bash
 claude mcp add --transport http memory-lane http://127.0.0.1:4173/mcp --header "Authorization: Bearer <token>"
 ```
+
+Cursor, in `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "memory-lane": {
+      "url": "http://127.0.0.1:4173/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+claude.ai, Claude Desktop and ChatGPT: add a custom connector with the URL form of a deployed server, `https://<your-project>.vercel.app/mcp?token=<token>`, and no sign-in.
+
+To check a connection, ask the agent to "search memory for anything about me": it should call `memory_search`.
 
 ### Always-on instructions
 
@@ -66,14 +85,23 @@ I use the Memory Lane MCP server (tools: memory_search, memory_save, memory_upda
 
 ## Core instructions
 
-Core instructions are yours alone: agents can read them but no MCP tool can change them. Write them in a file and send them to the server:
+Core instructions are yours alone: agents can read them but no MCP tool can change them. Write them in a file (up to 4000 characters) and send them to the running server:
 
 ```bash
 npm run core -- set my-core.md
 npm run core -- show
 ```
 
-The command talks to the server's API, so it works for a local server and a deployed one. For a deployed one, set `MEMORY_LANE_URL` and `MCP_TOKEN` first.
+The command talks to the server's API, so it works for a local server and a deployed one. Each `set` bumps the version and keeps the previous text.
+
+For a deployed server, run the same command from a clone of this repository on your machine, pointing it at the deployment. `MCP_TOKEN` is the token you set in Vercel:
+
+```bash
+MEMORY_LANE_URL=https://<your-project>.vercel.app MCP_TOKEN=<token> npm run core -- set my-core.md
+MEMORY_LANE_URL=https://<your-project>.vercel.app MCP_TOKEN=<token> npm run core -- show
+```
+
+Without those variables the command talks to the local server and reads the token from `.memory-lane/token`.
 
 ## The API
 
@@ -84,7 +112,7 @@ For building your own page or tools on top. Every request needs `Authorization: 
 | `GET /memory/api?q=&year=&cursor=` | Page through memories, newest first. |
 | `DELETE /memory/api` with `{"ids": [1, 2]}` | Delete memories. |
 | `GET /memory/api?core=1` | Core instructions, their version and history. |
-| `PUT /memory/api` with `{"content": "...", "version": 3}` | Save Core instructions; fails with 409 if the version is stale. |
+| `PUT /memory/api` with `{"content": "...", "version": 3}` | Save Core instructions. `version` is the one `GET /memory/api?core=1` returned; the save fails with 409 if it is stale. |
 
 A page you build needs its own sign-in: this server only knows the token, and the token should never reach a browser.
 
