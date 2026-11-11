@@ -1,3 +1,4 @@
+import { registerProposeTool } from "./memory/propose-mcp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { MEMORY_INSTRUCTIONS, coreBlock, registerMemoryTools, type MemoryMcpOptions } from "./memory/mcp.js";
 
@@ -14,5 +15,9 @@ export function createServer(options: MemoryMcpOptions & { coreInstructions?: { 
     { instructions: `${options.coreInstructions ? coreBlock(options.coreInstructions) : ""}${MEMORY_INSTRUCTIONS}` },
   );
   registerMemoryTools(server, options);
+  registerProposeTool(server, { ...options,
+    reviewPlace: "the local Web UI at /memory/review (run npm start -- --db neon when using a deployed server, with the same database)",
+    scanGuide: "For a scan, browse memory_search without a query and follow its pagination to load the memories. Group memories about the same subject and propose each group separately. Do not update or delete memories included in a proposal.",
+  });
   return server;
 }

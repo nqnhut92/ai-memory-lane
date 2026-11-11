@@ -1,3 +1,4 @@
+import { loadLocalEnv } from "../lib/local-config.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -5,6 +6,7 @@ import { join } from "node:path";
 //   npm run core -- show
 //   npm run core -- set my-core.md
 // MEMORY_LANE_URL (default http://127.0.0.1:4173) and MCP_TOKEN (default: the token the local server generated).
+try { loadLocalEnv(); } catch { console.error("Could not load .env."); process.exit(1); }
 const base = (process.env.MEMORY_LANE_URL || "http://127.0.0.1:4173").replace(/\/$/, "");
 const tokenFile = join(process.env.MEMORY_DATA_DIR || ".memory-lane", "token");
 const token = process.env.MCP_TOKEN || (existsSync(tokenFile) ? readFileSync(tokenFile, "utf8").trim() : "");

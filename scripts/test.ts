@@ -40,7 +40,7 @@ process.env.MCP_TOKEN = "short";
 assert.equal((await post({ Authorization: "Bearer short" })).status, 500);
 process.env.MCP_TOKEN = token;
 
-// A real client: server identity, instructions with the Core text, exactly the five memory tools, no cleanup tool.
+// A real client: server identity, instructions with the Core text, exactly five memory tools, including cleanup proposals.
 const client = new Client({ name: "test", version: "1" });
 await client.connect(new StreamableHTTPClientTransport(new URL("http://memory-lane.test/mcp"), {
   requestInit: { headers: bearer },
@@ -48,12 +48,20 @@ await client.connect(new StreamableHTTPClientTransport(new URL("http://memory-la
 }));
 assert.equal(client.getServerVersion()?.name, "memory-lane");
 assert.match(client.getInstructions() ?? "", /Reply in English\./);
-assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), ["memory_delete", "memory_save", "memory_search", "memory_update"]);
+assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), ["memory_delete", "memory_propose", "memory_save", "memory_search", "memory_update"]);
 const found = await client.callTool({ name: "memory_search", arguments: { query: "pnpm node" } });
 assert.match(JSON.stringify(found), /Core instructions, version 2/);
 assert.match(JSON.stringify(found), /Uses pnpm for every Node project/);
 const again = await client.callTool({ name: "memory_search", arguments: { query: "pnpm node", core_version: 2 } });
 assert.match(JSON.stringify(again), /unchanged since you read them/);
+// Proposal creation through MCP; the deployed bearer API supports review decisions too.
+const ids = (await store.save([
+  { content: "The studio walls are painted blue.", date: "2025-01-01", force: true },
+  { content: "The studio walls are now painted green.", date: "2026-01-01", force: true },
+])).map(result => { assert.equal(result.status, "saved"); return result.memory.id; });
+const proposed = await client.callTool({ name: "memory_propose", arguments: { proposals: [{ ids, kind: "superseded", final_text: "The studio walls are now painted green.", reason: "The newer color replaces the old color." }] } });
+assert.ok(!proposed.isError, JSON.stringify(proposed));
+assert.match(JSON.stringify(proposed), /1 of 1 stored/);
 await client.close();
 
 // The page API takes the same token in a header only, and edits the Core instructions.
@@ -66,5 +74,7 @@ assert.equal(coreState.core.content, "Reply in English.");
 const put = await api("", { method: "PUT", headers: { ...bearer, "content-type": "application/json" }, body: JSON.stringify({ content: "Reply in Vietnamese.", version: coreState.core.version }) });
 assert.equal(put.status, 200);
 assert.equal((await store.core()).content, "Reply in Vietnamese.");
+
+await import("./test-local.js");
 
 console.log("memory lane: guardrails, Core instructions, MCP auth, tools and API passed");

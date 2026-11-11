@@ -4,7 +4,7 @@
 
 Memory Lane is a small [MCP](https://modelcontextprotocol.io) server. Connect it to Claude, ChatGPT, Cursor, Codex or any client that speaks MCP, and they all read and write the same memories: your preferences, your corrections, the facts about you and your projects that an agent should not have to ask twice.
 
-There is no page and no sign-in. It is a server, a PostgreSQL database and one token.
+The Web UI runs only on your machine, with no sign-in. MCP clients connect locally or to a deployed server using one token.
 
 ## What is in it
 
@@ -19,12 +19,33 @@ Needs Node.js 22 or newer. Clone this repository, then run in its folder:
 
 ```bash
 npm install
-npm start
+npm start                  # local persistent PGlite database
+# npm start -- --db neon    # connect the local UI and MCP to Neon instead
 ```
 
-Leave it running. The server listens on `http://127.0.0.1:4173`, keeps its data in `.memory-lane/`, and prints its token every time it starts (the token is created on the first run and saved in `.memory-lane/token`). Set `PORT` or `MEMORY_DATA_DIR` to change where it runs and stores data, or `MCP_TOKEN` to bring your own. `MEMORY_FIXTURES=1 npm start` uses a throwaway in-memory database with a few sample memories.
+Leave it running and open `http://127.0.0.1:4173/memory`. The UI lets you search and delete memories, edit and restore Core instructions, and review cleanup proposals at `/memory/review` (edit, approve, reject and undo). It keeps local data in `.memory-lane/`. Set `PORT` or `MEMORY_DATA_DIR` to change the port or data directory.
 
-Only your own machine can reach it, and requests with an unexpected `Host` header are refused. That also means web clients such as claude.ai and ChatGPT cannot use a local server: they connect from the internet, so deploy it for those.
+The server creates an MCP token on first run in `.memory-lane/token`, or uses your `MCP_TOKEN` environment variable (at least 32 characters). Read the token file privately to configure an MCP client; the browser UI does not need it. The token is never included in UI HTML or assets.
+
+### Local UI with a Neon database
+
+```bash
+npm start -- --db neon
+```
+
+Set `MEMORY_DATABASE_URL` to your Neon connection string first, through the environment or an untracked `.env` file. Both the local runner and Core CLI load `.env` from the current working directory without replacing variables already in the shell. Do not commit credentials.
+
+The default remains PGlite even if `MEMORY_DATABASE_URL` is present. Neon mode fails if the URL is missing or startup cannot connect; it never falls back to a different database. Startup checks may initialize or update the memory schema. The UI displays **Neon database · live changes**: edits affect that connected database directly, including production if you select it. Use a separate Neon branch for testing.
+
+`MEMORY_FIXTURES=1 npm start` uses temporary in-memory sample data, reset on restart. Fixtures are refused in Neon mode. There is no automatic copy or sync between PGlite and Neon.
+
+### Cleanup proposals
+
+Ask a connected AI client to “scan my memories”. The `memory_propose` tool groups related memories into proposals; it cannot approve them. Review proposals locally at `/memory/review`. A deployed MCP server can create proposals while the UI is offline: start the local UI in Neon mode with the **same database** to review them later. Local PGlite proposals require an AI client connected to that local MCP server.
+
+The server binds to loopback only, and requests with an unexpected `Host` header are refused. Browser API calls must be same-origin; command-line API calls need a bearer token. Browsers without Fetch Metadata support must use the CLI/API instead. This protects against other websites, not other processes or users with access to your machine and token file. That also means web clients such as claude.ai and ChatGPT cannot use a local server: they connect from the internet, so deploy it for those.
+
+The Web UI and its assets are served only by the local runner, outside the deployment’s `public/` directory. Deploying this repository does not publish the Web UI or enable unauthenticated browser API access.
 
 The commands here that start with `NAME=value` are for macOS and Linux shells. In Windows PowerShell, set the variable first: `$env:MEMORY_FIXTURES = "1"; npm start`.
 
@@ -39,7 +60,7 @@ A local database lives on one machine. To use the same memory from several machi
    - `MCP_TOKEN`: at least 32 random characters (`openssl rand -hex 32`). The server refuses to run with a shorter one.
 4. Deploy. Your endpoint is `https://<your-project>.vercel.app/mcp`.
 
-The schema is created on first use.
+The schema is created on first use. The deployed MCP includes `memory_propose`; review its proposals using the local UI in Neon mode.
 
 ## Connect an AI client
 
@@ -137,5 +158,6 @@ api/memory.ts        Bearer-token API
 lib/memory/          store (SQL), tools, Core instructions, PGlite helper
 lib/mcp-http.ts      Token check and transport shared by the endpoint
 scripts/             local server, Core command, tests
+web/                 Shared memory UI assets and local shell (local runner only)
 public/index.html    The only static page on a deployment
 ```

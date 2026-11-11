@@ -1,0 +1,11 @@
+.local-header { position:sticky;top:18px;z-index:30;display:flex;align-items:center;gap:24px;min-height:72px;margin-top:18px;padding:12px 20px;border-radius:24px; }
+.local-brand { display:flex;align-items:center;gap:10px;font-size:14px;font-weight:650;white-space:nowrap; }
+.local-header nav { display:flex;gap:18px;font-size:12px; }
+.local-header nav a { color:var(--muted); }
+.local-header nav a[aria-current=page] { color:var(--accent);font-weight:650; }
+.database-mode { margin-left:auto;font-size:11px;color:var(--muted); }
+.database-mode.remote { color:var(--error); }
+.local-theme { display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;border-radius:50%; }
+.skip-link { position:fixed;top:-100px;left:20px;z-index:100;background:var(--card);padding:10px; }
+.skip-link:focus { top:10px; }
+@media(max-width:760px) { .local-header { display:grid;grid-template-columns:auto 1fr auto;gap:12px 8px;padding-inline:14px; }.local-header nav { gap:10px;justify-self:center; }.database-mode { grid-column:1 / -1;grid-row:2;margin-left:0; }.local-theme { justify-self:end; }.mem-yearnav { top:150px; } }

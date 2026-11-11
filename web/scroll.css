@@ -1,0 +1,24 @@
+/* Native scrolling: the OS decides whether scrollbars overlay content. */
+:root { --scroll-thumb:color-mix(in srgb,var(--text,#202124) 18%,transparent); --scroll-thumb-active:color-mix(in srgb,var(--text,#202124) 28%,transparent); }
+:where(html) { scrollbar-gutter:stable; }
+:where(*) { scrollbar-width:thin; scrollbar-color:var(--scroll-thumb) transparent; }
+:where(*:hover,*:focus-within) { scrollbar-color:var(--scroll-thumb-active) transparent; }
+:where(*)::-webkit-scrollbar { width:8px; height:8px; }
+:where(*)::-webkit-scrollbar-track { background:transparent; }
+:where(*)::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:999px; background:var(--scroll-thumb); background-clip:padding-box; }
+:where(*:hover,*:focus-within)::-webkit-scrollbar-thumb { background-color:var(--scroll-thumb-active); }
+:where(*)::-webkit-scrollbar-corner { background:transparent; }
+/* Opt in only the moving content, never a wrapper containing fixed/sticky controls.
+   The controller sets edge flags after measuring the current scroll position. */
+.fe-scroll-fade { --scroll-fade-start:0px; --scroll-fade-end:0px; --scroll-fade-size:14px; scroll-padding-block:var(--scroll-fade-size); }
+.fe-scroll-fade[data-scroll-start=true] { --scroll-fade-start:var(--scroll-fade-size); }
+.fe-scroll-fade[data-scroll-end=true] { --scroll-fade-end:var(--scroll-fade-size); }
+.fe-scroll-fade { mask-image:linear-gradient(to bottom,transparent,#000 var(--scroll-fade-start),#000 calc(100% - var(--scroll-fade-end)),transparent); }
+.fe-scroll-fade[data-scroll-axis=x] { scroll-padding-inline:var(--scroll-fade-size); mask-image:linear-gradient(to right,transparent,#000 var(--scroll-fade-start),#000 calc(100% - var(--scroll-fade-end)),transparent); }
+/* Keep keyboard focus and high contrast controls fully visible. No motion required. */
+.fe-scroll-fade:focus-within { mask-image:none; }
+@media(forced-colors:active) {
+ :where(*) { scrollbar-width:auto; scrollbar-color:auto; }
+ :where(*)::-webkit-scrollbar,:where(*)::-webkit-scrollbar-thumb,:where(*)::-webkit-scrollbar-track { all:revert; }
+ .fe-scroll-fade { mask-image:none; }
+}
