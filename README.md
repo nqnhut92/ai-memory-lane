@@ -161,3 +161,15 @@ scripts/             local server, Core command, tests
 web/                 Shared memory UI assets and local shell (local runner only)
 public/index.html    The only static page on a deployment
 ```
+
+## Support
+
+- **International:** [Support on Ko-fi](https://ko-fi.com/nqnhut92)
+- **Vietnam (MoMo / VietQR):**
+
+<details>
+<summary>Show MoMo / VietQR code (0% fee · scan with any Vietnamese banking app)</summary>
+
+<img src=".github/support-qr.png" alt="MoMo and VietQR code" width="240">
+
+</details>
