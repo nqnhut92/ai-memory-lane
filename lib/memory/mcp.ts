@@ -31,7 +31,7 @@ function text(value: string, isError = false) {
 }
 
 function describe(memory: Memory): string {
-  const meta = [memory.occurredAt.slice(0, 10), memory.tags.length ? "#" + memory.tags.join(" #") : ""].filter(Boolean).join(" · ");
+  const meta = [memory.occurredAt.slice(0, 10), memory.edited ? "updated " + memory.updatedAt.slice(0, 10) : "", memory.tags.length ? "#" + memory.tags.join(" #") : ""].filter(Boolean).join(" · ");
   return `#${memory.id} [${meta}] ${memory.content}`;
 }
 
@@ -75,7 +75,7 @@ export function registerMemoryTools(server: McpServer, options: MemoryMcpOptions
 
   server.registerTool("memory_search", {
     title: "Search memories",
-    description: "Search the user's shared long-term memories by key words. Every call without cursor starts with the owner's Core instructions: follow them; the owner's words in the current conversation override them, and they override skills and memories. Make it your first tool call in every conversation, then call it again for every user message that brings something new (a task, topic, person, project, tool or preference), with 3-6 key words, plain and broader ones (a screenshot review: 'image screenshot design visual'); skip pure acknowledgements ('ok', 'go ahead'). Pass core_version once you have the Core instructions, to get a one-line 'unchanged' instead of the full text. Memories are stored in English, so search in English (translate the user's words); matching ignores case and accents. Also search before memory_save. The best matches come back newest first; when two disagree, the later one is current: follow it and memory_update or memory_delete the older. Omit query to browse instead: memories newest first (continue with cursor), with a usage summary (count, size, limits) above the first page; use it for a review or a cleanup.",
+    description: "Search the user's shared long-term memories by key words. Every call without cursor starts with the owner's Core instructions: follow them; the owner's words in the current conversation override them, and they override skills and memories. Make it your first tool call in every conversation, then call it again for every user message that brings something new (a task, topic, person, project, tool or preference), with 3-6 key words, plain and broader ones (a screenshot review: 'image screenshot design visual'); skip pure acknowledgements ('ok', 'go ahead'). Pass core_version once you have the Core instructions, to get a one-line 'unchanged' instead of the full text. Memories are stored in English, so search in English (translate the user's words); matching ignores case and accents. Also search before memory_save. The best matches come back newest first; when two disagree, the later one is current (a memory marked 'updated' counts from its update day): follow it and memory_update or memory_delete the older. Omit query to browse instead: memories newest first (continue with cursor), with a usage summary (count, size, limits) above the first page; use it for a review or a cleanup.",
     inputSchema: {
       query: z.string().min(1).max(200).optional().describe("A few key words, e.g. \"pnpm package manager\". Omit to browse newest first."),
       limit: z.number().int().min(1).max(200).optional().describe("Default 10 when searching, 50 when browsing"),
@@ -90,7 +90,7 @@ export function registerMemoryTools(server: McpServer, options: MemoryMcpOptions
       if (cursor !== undefined) return "cursor only works when browsing: omit query to browse.";
       const [core, matches] = await Promise.all([withCore ? store().core() : null, store().search({ query, limit: Math.min(limit ?? 10, 50) })]);
       // The store picks the best matches by relevance; among those, newest first, so when two disagree the later one reads first.
-      const found = [...matches].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+      const found = [...matches].sort((a, b) => b.sortAt.localeCompare(a.sortAt));
       return (core ? coreBlock(core, core_version) : "") + (found.length ? found.map(describe).join("\n") : `No memories match "${query}".`);
     }
     const first = cursor === undefined;

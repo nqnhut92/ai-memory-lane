@@ -41,14 +41,18 @@ const formats = zone => ({
   time: new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: zone }),
   full: new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: zone }),
   fullDay: new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeZone: zone }),
+  shortDay: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: zone }),
   parts: new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: zone }),
 });
 const local = formats(timeZone), utc = formats('UTC');
+// An edited memory sits on the day of its last edit (with a real time), like the server sorts it.
 const when = memory => {
-  const date = new Date(memory.occurredAt), f = memory.dateOnly ? utc : local;
+  const dayOnly = memory.dateOnly && !memory.edited;
+  const date = new Date(memory.edited ? memory.sortAt : memory.occurredAt), f = dayOnly ? utc : local;
   const { year, month } = Object.fromEntries(f.parts.formatToParts(date).map(p => [p.type, p.value]));
-  return { date, year, month, monthName: f.month.format(date), day: f.day.format(date).replace(',', ''), time: memory.dateOnly ? '' : f.time.format(date), full: memory.dateOnly ? f.fullDay.format(date) : f.full.format(date) };
+  return { dayKey: (dayOnly ? utc.shortDay : local.shortDay).format(date), date, year, month, monthName: f.month.format(date), day: f.day.format(date).replace(',', ''), time: dayOnly ? '' : f.time.format(date), full: dayOnly ? f.fullDay.format(date) : f.full.format(date) };
 };
+const firstDay = memory => (memory.dateOnly ? utc.shortDay : local.shortDay).format(new Date(memory.occurredAt));
 const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 async function load(more = false) {
@@ -383,11 +387,13 @@ function entry(memory) {
   ];
   return h('li', { class: 'mem-entry' + (confirming ? ' confirming' : ''), 'data-id': String(memory.id) },
     h('div', { class: 'mem-when' },
-      h('time', { datetime: memory.dateOnly ? memory.occurredAt.slice(0, 10) : memory.occurredAt, title: at.full + (memory.dateOnly ? ' (day only, no time)' : ''), text: at.day }),
+      h('time', { datetime: memory.edited ? memory.sortAt : memory.dateOnly ? memory.occurredAt.slice(0, 10) : memory.occurredAt, title: at.full + (memory.dateOnly && !memory.edited ? ' (day only, no time)' : ''), text: at.day }),
       at.time && h('span', { text: at.time })),
     h('div', { class: 'mem-body' },
       h('p', { class: 'mem-content', text: memory.content }),
-      memory.tags.length > 0 && h('div', { class: 'mem-meta' }, memory.tags.map(tag => h('span', { class: 'mem-tag', text: '#' + tag })))),
+      (memory.edited || memory.tags.length > 0) && h('div', { class: 'mem-meta' },
+        memory.edited && h('span', { class: 'mem-edited', title: 'Edited ' + at.full + '. First dated ' + (memory.dateOnly ? utc.fullDay : local.fullDay).format(new Date(memory.occurredAt)), text: firstDay(memory) === at.dayKey ? 'Updated' : 'Updated · first dated ' + firstDay(memory) }),
+        memory.tags.map(tag => h('span', { class: 'mem-tag', text: '#' + tag })))),
     h('div', { class: 'mem-actions' }, actions));
 }
 

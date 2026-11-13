@@ -37,6 +37,10 @@ export interface Memory {
   dateOnly: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The memory's content or day was changed after it was saved (updatedAt is later than createdAt and occurredAt). */
+  edited: boolean;
+  /** Where the memory sorts: the day of its last edit when edited, otherwise occurredAt. Newest first. */
+  sortAt: string;
 }
 
 export interface NewMemory { content: string; tags?: string[]; date?: string; force?: boolean }
@@ -198,7 +202,12 @@ function cleanTimeZone(timeZone: string | undefined): string {
 
 const iso = (value: unknown): string => new Date(value as string).toISOString();
 
+/** SQL twin of Memory.sortAt, so ordering, paging and the year filter agree with what row() returns. */
+export const SORT_AT = "(CASE WHEN updated_at > created_at + interval '1 second' AND updated_at > occurred_at THEN updated_at ELSE occurred_at END)";
+
 export function row(record: Record<string, any>): Memory {
+  const edited = new Date(record.updated_at).getTime() > new Date(record.created_at).getTime() + 1000
+    && new Date(record.updated_at).getTime() > new Date(record.occurred_at).getTime();
   return {
     id: Number(record.id),
     content: record.content,
@@ -207,13 +216,15 @@ export function row(record: Record<string, any>): Memory {
     dateOnly: Boolean(record.date_only),
     createdAt: iso(record.created_at),
     updatedAt: iso(record.updated_at),
+    edited,
+    sortAt: iso(edited ? record.updated_at : record.occurred_at),
   };
 }
 
 export const COLUMNS = "id, content, tags, occurred_at, date_only, created_at, updated_at";
 
 function encodeCursor(memory: Memory): string {
-  return Buffer.from(`${memory.occurredAt}|${memory.id}`).toString("base64url");
+  return Buffer.from(`${memory.sortAt}|${memory.id}`).toString("base64url");
 }
 
 function decodeCursor(cursor: string | undefined): [string, number] | undefined {
@@ -250,7 +261,7 @@ function filterConditions(filter: MemoryFilter, params: unknown[]): string[] {
   const where: string[] = [];
   if (filter.year) {
     params.push(cleanTimeZone(filter.timeZone), filter.year);
-    where.push(`extract(year FROM occurred_at AT TIME ZONE $${params.length - 1})::int = $${params.length}`);
+    where.push(`extract(year FROM ${SORT_AT} AT TIME ZONE $${params.length - 1})::int = $${params.length}`);
   }
   if (filter.query && fold(filter.query)) where.push(`(${wordConditions(filter.query, params)})`);
   return where;
@@ -564,7 +575,7 @@ export function createMemoryStore(sql: SqlRunner, onTiming: MemoryTiming = () =>
       params.push(Math.min(Math.max(limit, 1), 50));
       const run = () => sql.query(
         `SELECT ${COLUMNS}, ${words} + word_similarity($1, folded) AS score
-         FROM memories WHERE ${where} ORDER BY score DESC, occurred_at DESC LIMIT $${params.length}`,
+         FROM memories WHERE ${where} ORDER BY score DESC, ${SORT_AT} DESC LIMIT $${params.length}`,
         params,
       );
       // Search is the hot path: every conversation starts with one.
@@ -591,7 +602,7 @@ export function createMemoryStore(sql: SqlRunner, onTiming: MemoryTiming = () =>
           params,
         );
       };
-      const years = await run({}, "extract(year FROM occurred_at AT TIME ZONE $TZ)::int AS year", "ORDER BY 1 DESC");
+      const years = await run({}, `extract(year FROM ${SORT_AT} AT TIME ZONE $TZ)::int AS year`, "ORDER BY 1 DESC");
       return { years: years.map((r) => ({ year: r.year, count: r.count })) };
     },
 
@@ -600,12 +611,12 @@ export function createMemoryStore(sql: SqlRunner, onTiming: MemoryTiming = () =>
       const params: unknown[] = [];
       const where = filterConditions(options, params);
       const cursor = decodeCursor(options.cursor);
-      if (cursor) { params.push(cursor[0], cursor[1]); where.push(`(occurred_at, id) < ($${params.length - 1}::timestamptz, $${params.length}::bigint)`); }
+      if (cursor) { params.push(cursor[0], cursor[1]); where.push(`(${SORT_AT}, id) < ($${params.length - 1}::timestamptz, $${params.length}::bigint)`); }
       const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
       params.push(limit + 1);
       const rows = await sql.query(
         `SELECT ${COLUMNS} FROM memories ${where.length ? "WHERE " + where.join(" AND ") : ""}
-         ORDER BY occurred_at DESC, id DESC LIMIT $${params.length}`,
+         ORDER BY ${SORT_AT} DESC, id DESC LIMIT $${params.length}`,
         params,
       );
       const items = rows.slice(0, limit).map(row);
@@ -619,7 +630,7 @@ export function createMemoryStore(sql: SqlRunner, onTiming: MemoryTiming = () =>
            pg_database_size(current_database())::bigint AS database_bytes, pg_total_relation_size('memories')::bigint AS table_bytes FROM memories`,
       );
       const years = await sql.query(
-        "SELECT extract(year FROM occurred_at AT TIME ZONE $1)::int AS year, count(*)::int AS count FROM memories GROUP BY 1 ORDER BY 1 DESC",
+        `SELECT extract(year FROM ${SORT_AT} AT TIME ZONE $1)::int AS year, count(*)::int AS count FROM memories GROUP BY 1 ORDER BY 1 DESC`,
         [cleanTimeZone(timeZone)],
       );
       return {
