@@ -81,18 +81,20 @@ export function registerMemoryTools(server: McpServer, options: MemoryMcpOptions
       limit: z.number().int().min(1).max(200).optional().describe("Default 10 when searching, 50 when browsing"),
       cursor: z.string().max(200).optional().describe("Browsing only: the next cursor from a previous call"),
       core_version: z.number().int().min(0).optional().describe("The Core instructions version you already have (from an earlier result in this conversation). If it is still current, they are not repeated."),
+      include_core: z.boolean().optional().describe("Default true. Pass false to get only the memories, with no Core instructions block; use it when your client treats the instructions block in a tool result as untrusted and ignores the whole result."),
     },
     annotations: { readOnlyHint: true },
-  }, ({ query, limit, cursor, core_version }) => guarded(async () => {
+  }, ({ query, limit, cursor, core_version, include_core }) => guarded(async () => {
+    const withCore = include_core !== false;
     if (query !== undefined) {
       if (cursor !== undefined) return "cursor only works when browsing: omit query to browse.";
-      const [core, matches] = await Promise.all([store().core(), store().search({ query, limit: Math.min(limit ?? 10, 50) })]);
+      const [core, matches] = await Promise.all([withCore ? store().core() : null, store().search({ query, limit: Math.min(limit ?? 10, 50) })]);
       // The store picks the best matches by relevance; among those, newest first, so when two disagree the later one reads first.
       const found = [...matches].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-      return coreBlock(core, core_version) + (found.length ? found.map(describe).join("\n") : `No memories match "${query}".`);
+      return (core ? coreBlock(core, core_version) : "") + (found.length ? found.map(describe).join("\n") : `No memories match "${query}".`);
     }
     const first = cursor === undefined;
-    const [core, page] = await Promise.all([first ? store().core() : null, store().list({ limit, cursor })]);
+    const [core, page] = await Promise.all([first && withCore ? store().core() : null, store().list({ limit, cursor })]);
     const summary = first ? (core ? coreBlock(core, core_version) : "") + await usage(store()) + "\n\n" : "";
     if (!page.items.length) return summary + "No memories yet.";
     return summary + page.items.map(describe).join("\n") + (page.next ? `\n\nMore: call memory_search without query and with cursor "${page.next}".` : "");
