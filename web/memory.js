@@ -32,6 +32,7 @@ const icons = {
   database: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
   pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
 };
 
 // Date-only memories (a day given without a time) are stored at noon UTC on that day: format them in UTC.
@@ -133,6 +134,40 @@ async function saveCore(payload, done) {
 
 const shortDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone });
 
+let copyTimer;
+async function copyCore(button) {
+  const content = core.data?.content ?? '';
+  const label = button?.querySelector('span');
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(content);
+    } else {
+      const field = document.createElement('textarea');
+      field.value = content;
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.focus();
+      field.select();
+      const copied = document.execCommand('copy');
+      field.remove();
+      if (!copied) throw new Error('Copy not allowed');
+    }
+    if (label) label.textContent = 'Copied';
+    announce('Core instructions copied.');
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      if (label && label.isConnected) label.textContent = 'Copy';
+    }, 1500);
+  } catch {
+    if (label) label.textContent = 'Copy failed';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      if (label && label.isConnected) label.textContent = 'Copy';
+    }, 1500);
+  }
+}
+
 function coreCard() {
   // Shaped like the card (eyebrow, intro, text block), so the timeline below does not jump when it arrives.
   if (!core.data && !core.error) return h('section', { class: 'hub-instructions mem-core', role: 'status', 'aria-busy': 'true', 'aria-label': 'Loading Core instructions' },
@@ -147,7 +182,9 @@ function coreCard() {
       h('p', { class: 'eyebrow', text: 'ALWAYS ON' }),
       h('h3', { text: 'Core instructions' }),
       h('p', { text: 'Every AI client gets these first from memory_search, above any memory. Your words in a chat override them; they override skills and memories. Only this page can change them.' })),
-    !editing && core.data && h('button', { type: 'button', id: 'core-edit', class: 'hub-copy', onclick: () => { core.draft = core.data.content; core.notice = ''; core.error = ''; render(); document.getElementById('core-editor')?.focus(); } }, svg(icons.pencil, 14), h('span', { text: 'Edit' })));
+    !editing && core.data && h('div', { class: 'mem-core-actions' },
+      h('button', { type: 'button', id: 'core-copy', class: 'hub-copy', onclick: e => copyCore(e.currentTarget) }, svg(icons.copy, 14), h('span', { text: 'Copy' })),
+      h('button', { type: 'button', id: 'core-edit', class: 'hub-copy', onclick: () => { core.draft = core.data.content; core.notice = ''; core.error = ''; render(); document.getElementById('core-editor')?.focus(); } }, svg(icons.pencil, 14), h('span', { text: 'Edit' }))));
   if (!core.data) return h('section', { class: 'hub-instructions mem-core', 'aria-label': 'Core instructions' }, head, h('p', { class: 'mem-error', role: 'alert', text: core.error }),
     h('button', { type: 'button', class: 'text-button', text: 'Try again ↻', onclick: () => { core.error = ''; render(); loadCore(); } }));
   const body = editing
