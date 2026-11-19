@@ -78,7 +78,7 @@ export function registerMemoryTools(server: McpServer, options: MemoryMcpOptions
     description: "Search the user's shared long-term memories by key words. Every call without cursor starts with the owner's Core instructions: follow them; the owner's words in the current conversation override them, and they override skills and memories. Make it your first tool call in every conversation, then call it again for every user message that brings something new (a task, topic, person, project, tool or preference), with 3-6 key words, plain and broader ones (a screenshot review: 'image screenshot design visual'); skip pure acknowledgements ('ok', 'go ahead'). Pass core_version once you have the Core instructions, to get a one-line 'unchanged' instead of the full text. Memories are stored in English, so search in English (translate the user's words); matching ignores case and accents. Also search before memory_save. The best matches come back newest first; when two disagree, the later one is current (a memory marked 'updated' counts from its update day): follow it and memory_update or memory_delete the older. Omit query to browse instead: memories newest first (continue with cursor), with a usage summary (count, size, limits) above the first page; use it for a review or a cleanup.",
     inputSchema: {
       query: z.string().min(1).max(200).optional().describe("A few key words, e.g. \"pnpm package manager\". Omit to browse newest first."),
-      limit: z.number().int().min(1).max(200).optional().describe("Default 10 when searching, 50 when browsing"),
+      limit: z.number().int().min(1).max(200).optional().describe("Default 5 when searching, 50 when browsing"),
       cursor: z.string().max(200).optional().describe("Browsing only: the next cursor from a previous call"),
       core_version: z.number().int().min(0).optional().describe("The Core instructions version you already have (from an earlier result in this conversation). If it is still current, they are not repeated."),
       include_core: z.boolean().optional().describe("Default true. Pass false to get only the memories, with no Core instructions block; use it when your client treats the instructions block in a tool result as untrusted and ignores the whole result."),
@@ -88,7 +88,7 @@ export function registerMemoryTools(server: McpServer, options: MemoryMcpOptions
     const withCore = include_core !== false;
     if (query !== undefined) {
       if (cursor !== undefined) return "cursor only works when browsing: omit query to browse.";
-      const [core, matches] = await Promise.all([withCore ? store().core() : null, store().search({ query, limit: Math.min(limit ?? 10, 50) })]);
+      const [core, matches] = await Promise.all([withCore ? store().core() : null, store().search({ query, limit: Math.min(limit ?? 5, 50) })]);
       // The store picks the best matches by relevance; among those, newest first, so when two disagree the later one reads first.
       const found = [...matches].sort((a, b) => b.sortAt.localeCompare(a.sortAt));
       return (core ? coreBlock(core, core_version) : "") + (found.length ? found.map(describe).join("\n") : `No memories match "${query}".`);

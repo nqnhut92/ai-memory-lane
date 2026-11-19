@@ -566,7 +566,7 @@ export function createMemoryStore(sql: SqlRunner, onTiming: MemoryTiming = () =>
       return rows.map((record) => Number(record.id)).sort((a, b) => a - b);
     },
 
-    async search({ query, limit = 10 }) {
+    async search({ query, limit = 5 }) {
       const text = fold(query);
       if (!text) return [];
       const params: unknown[] = [text];
