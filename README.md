@@ -4,6 +4,8 @@
 
 Memory Lane is a small [MCP](https://modelcontextprotocol.io) server. Connect it to Claude, ChatGPT, Cursor, Codex or any MCP client so they all read and write the same memories and follow your Core instructions. The Web UI runs locally without sign-in; MCP clients connect locally or to a deployed server with one token.
 
+**Tech stack:** TypeScript, Node.js 22+, `@modelcontextprotocol/sdk`, PostgreSQL ([Neon](https://neon.tech)) / embedded [PGlite](https://pglite.dev), Vercel.
+
 ## Features
 
 - **Versioned Core instructions:** one document returned first on `memory_search`, with `core_version` caching and optimistic locking.
